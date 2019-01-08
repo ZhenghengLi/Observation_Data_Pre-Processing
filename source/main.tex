@@ -1,0 +1,301 @@
+%\documentclass[referee]{raa}            % referee version: for submission
+\documentclass{raa}
+
+%% manuscript produces a one-column, double-spaced document
+\usepackage{graphicx,times} %for PS/EPS graphics inclusion, new
+\usepackage{graphicx}
+\usepackage{amsmath}
+%\usepackage{bm}
+\usepackage{lineno}
+\usepackage{url}
+\usepackage{array}
+\usepackage{pifont}
+\usepackage{caption}
+\usepackage{natbib}
+\usepackage{amssymb,amsmath}
+\usepackage{tablefootnote}
+\usepackage[colorlinks,unicode=true,linkcolor=green,anchorcolor=red,citecolor=blue,filecolor=red,pagecolor=red,urlcolor=red]{hyperref}
+
+\bibpunct{(}{)}{;}{a}{}{,}
+
+\begin{document}
+
+\title{Observation data pre-processing and scientific data products generation of POLAR}
+\volnopage{Vol.0 (20xx) No.0, 000--000}
+\setcounter{page}{1}
+\author{
+Zheng-Heng~Li\inst{1,2}
+\and Jian-Chao~Sun\inst{1}
+\and Li-Ming~Song\inst{1}
+\and Bo-Bing~Wu\inst{1}
+\and Lu~Li\inst{1}
+\and Xing~Wen\inst{1,2}
+\and Hua-Lin~Xiao\inst{1,3}
+\and Shao-Lin~Xiong\inst{1}
+\and Lai-Yu~Zhang\inst{1}
+\and Shuang-Nan~Zhang\inst{1}
+\and Yong-Jie~Zhang\inst{1}
+}
+
+\institute{Key Laboratory of Particle Astrophysics, Institute of High Energy Physics (IHEP), Chinese Academy of Sciences, Beijing 100049, China; {\it Zhengheng.Li@ihep.ac.cn} \\
+\and University of Chinese Academy of Sciences, Beijing 100049, China \\
+\and Paul Scherrer Institut, 5232 Villigen PSI, Switzerland \\
+\vs\no
+{\small Received~~2018 August 14;\quad accepted~~2019 January 3}
+}
+
+\abstract{
+POLAR is a compact space-borne detector initially designed to measure the polarization of hard X-ray emitted from Gamma-Ray Bursts in the energy range 50-500\,keV. This instrument has been launched successfully onboard the Chinese space laboratory TG-2 on 15th September, 2016. After being switched on a few days later, tens of gigabytes of detection raw data were produced in-orbit by POLAR and transferred to ground every day. Before the launch date, a full pipeline and the related software were designed and developed for the purpose to quickly pre-process all the raw data of POLAR, which include both science data and engineering data, then to generate the high level scientific data products that are suitable for later science analysis. This pipeline has been successfully applied for the use by the POLAR Science Data Center in IHEP after POLAR was launched and switched on. A detailed introduction of the pipeline and some of the core relevant algorithms are presented in this paper.
+\keywords{gamma-ray burst: general --- methods: data analysis --- instrumentation: polarimeters}
+}
+
+\authorrunning{Z.H. Li et al.}
+\titlerunning{Data Pre-Processing \& Data Products of POLAR}
+
+\maketitle
+
+\section{Introduction}\label{sec:introduction}
+
+POLAR~(\citealt{PRODUIT2005616}) is a compact space-borne detector which is specially designed and dedicated to measure the polarization of hard X-ray/Gamma-Ray emissions from Gamma-Ray Bursts (GRBs) in the energy range 50-500\,keV. POLAR uses plastic scintillators (PS) as the main detection material along with the multi-anode photomultiplier tube (MAPMT) to measure the polarization by measuring the distribution of azimuthal scattering angle of the incoming photons interacting with the detection material through Compton scattering process~(\citealt{Xiong2009}). The POLAR instrument consists of two major components, the OBOX (the Outer BOX mounted on the outer surface of TG-2) and IBOX (the Inner BOX mounted in the interior of TG-2), the details of which are described in Ref.~(\citealt{Produit2017}). POLAR has been launched onboard the Chinese space laboratory TG-2 on 15th September in 2016 and switched on successfully a few days later. Then, a series of in-orbit tests were performed and the normal science data acquisition was started subsequently, during which time tens of gigabytes of detection raw data were produced in-orbit by POLAR and transferred to ground every day. The directly downloaded raw data of POLAR have three types, which are SCI\_0B, AUX\_0B and ENG\_0B. The raw data of type SCI\_0B contains the scientific detection data of POLAR and the engineering data is stored in the raw data of type AUX\_0B and ENG\_0B. All the raw data of POLAR is the data stream of binary packets packed by the FPGA (Field-Programmable Gate Array) which are not easy to analyze directly for science purpose. Therefore, pre-processing all the detection raw data and generating well-organized high level scientific data products as quickly as possible are the first important steps and required by the POLAR experiment for the following science analysis, such as data quick-look, in-orbit calibration~(\citealt{LI20188}), polarization analysis for the detected GRBs, etc. The requirement of the data pre-processing and scientific data products generation for POLAR mainly include:
+\begin{itemize}
+\item iterating and decoding data packets as well as converting engineering data from binary values to physical values;
+\item doing time alignment between packets from the Center Trigger computer (CT) and the Front-End Electronics (FEE) in modules for each event;
+\item reconstructing the absolute time of each event;
+\item doing the coordinate transformation to calculate the direction of POLAR in the celestial coordinate (J2000);
+\item doing proper data merging and splitting to well organize all different kinds of data into a simple data structure which is friendly for science analysis.
+\end{itemize}
+
+A full pipeline and the related software to automatically do these works were designed, developed and tested before the launch date of POLAR and fully verified during the in-orbit test phase of POLAR after launch. After the raw data of POLAR arrive at IHEP, the three types of raw data are firstly decoded separately, and for the scientific detection data the time alignment for physical events are also performed in the decoding phase. Then using the decoded engineering data the absolute time of each event can be reconstructed. Finally, for the convenience of science analysis, all different kinds of data are merged together with a simple data structure and keeping only the necessary data fields that are directly needed by science analysis. The merged data is called SCI\_1Q and is used as the input and the standard data format for the science data analysis pipeline. Based on the data product of SCI\_1Q, some higher scientific data products for publication can also be generated concerning the data archiving and the scientific data products of some specific celestial events like GRB and solar flare events.
+
+As a part of the basic software suite of the POLAR Science Data Center (PSDC) in IHEP, this pipeline has been successfully running and taking service for the science data analysis of researchers after POLAR was launched. This pipeline can work automatically without manual intervention and will send an email to notice the researchers that new scientific data products are generated. Up to now, with the scientific data products generated by the pipeline of current version, the in-orbit instrument performance study and calibration has been finished and presented in Ref.~(\citealt{LI20188}), and the first scientific results of POLAR have been produced and submitted recently. This paper will give a detailed introduction of this pipeline and the main algorithms that are important and specially needed by POLAR. The program languages C++ and Python are widely used and the ROOT\footnote{\url{https://root.cern.ch}} Library developed by CERN is the main tool that was used in the pipeline to organize the scientific data products. Besides the pipeline, a table describing the main data structure specification for the high level scientific data products of POLAR in ROOT file will also be presented in this paper.
+
+\section{Raw data of POLAR}\label{sec:raw_data}
+
+The scientific detection data and the engineering data of POLAR are firstly online collected by and temporarily stored on the TG-2 platform, then transferred via telemetry to the ground station where all the data will be transferred to the Payload Operation \& Application Center (POAC) of TG-2 according to the data transmission schedule every day. The raw data of POLAR is finally transferred from POAC to IHEP through FTP and synchronized from IHEP to the cooperative institutes in Switzerland by rsync\footnote{\url{https://rsync.samba.org}}. All the raw data of POLAR directly downloaded from TG-2 is called the 0B level data, all of which is binary data. The 0B level data of POLAR have three types which are defined as SCI\_0B, AUX\_0B and ENG\_0B respectively and they are stored separately in different files. The 0B level data files are right the start and the initial input of the data pre-processing and scientific data products generation pipeline of POLAR. The three types of 0B level data are firstly summarized by Table~\ref{tab:raw_data}, then described in detail by the subsections. 
+
+\begin{table}[!ht]
+\centering
+\caption{Summary of raw data of POLAR}\label{tab:raw_data}
+\begin{tabular}{|p{1.2cm}|p{4.5cm}|p{2.5cm}|p{4.5cm}|}\hline
+Type & Packet Contents & Packet Frequency & Processing Requirements \\\hline
+SCI\_0B & Detection data of physical and pedestal events: trigger bits, energy deposition, timestamp, etc. & depending on event rate & Decoding, time alignment between trigger packets and module packets, absolute time reconstruction, etc.  \\\hline
+AUX\_0B & Operation mode, threshold and high voltage setting of each module, temperature of each module, etc. & 1 packet every 2 seconds & Decoding, connecting odd packet and even packet, conversion from digital value to physical value, etc. \\\hline
+ENG\_0B & Platform parameters data of TG-2, part of the housekeeping data, feedback of command injection, digital telemetry data & 1 packet per second for platform parameters data & Extraction of platform parameters data, decoding, coordinate calculation and transformation for the pointing direction of POLAR, etc.\\\hline
+\end{tabular}
+\end{table}
+
+\subsection{SCI\_0B Data}
+All the scientific detection data of POLAR is stored in the raw data file of type SCI\_0B. The majority of the scientific detection data is the physical event data collected from the MAPMT. This mainly includes the energy value of each channel with the unit of ADC (Analog-to-Digital Converter) channel, the trigger information of each channel, the time information of each event which is the local time of the instrument, etc. As discussed in Ref.~(\citealt{Produit2017}), POLAR consists of 25 standalone modules with their own Front-End Electronics (FEE) at the bottom side and a Center Trigger computer (CT) under the OBOX aluminum frame. For each physical event, there will be a trigger packet generated by the CT and one or more module packets generated by the corresponding triggered modules which have channels with energy deposition higher than the hardware threshold. The trigger packet has the information of which modules being triggered and therefore having data packets generated. While the module packets have the information of which channels being triggered. As each detected physical event has multiple data packets from both CT and FEEs and those packets are stored separately in the raw data file, there is a requirement to align those data packets that belong to the same event  after the packet iterating and decoding. The alignment between the trigger packet from CT and the module packets from FEEs is the basis for the event reconstruction from the raw data of POLAR. The algorithm of doing this alignment for the scientific detection data of POLAR will be presented in Section~\ref{sec:time_alignment}.
+
+\subsection{AUX\_0B Data}
+All the engineering data related to POLAR OBOX (also called auxiliary data or housekeeping data), such as the high voltage setting of each MAPMT, the temperature of each module measured by the temperature sensor mounted on the FEE, the OBOX operation mode, etc. is stored in the raw data file of type AUX\_0B. Those engineering parameters are very important and necessary for the science data analysis, especially for in-orbit calibration. The raw data of type AUX\_0B also contains the engineering data like the command injection feedbacks, the history of executed commands, the current and voltage measurement of electronics, etc. which are only needed for instrument testing and monitoring but not directly needed by later science data analysis. Not like type SCI\_0B whose data rate is dependent on the physical event rate, the data rate of the engineering data of POLAR OBOX is fixed, which is one new engineering data packet from OBOX every 2 seconds. Besides the high voltage setting and temperature measurement, there is another one kind of very important information stored in the engineering data of OBOX, that is the matching between the local time value of CT and the absolute GPS time value provided by the PPS (Pulse Per Second) signal from the GPS receiver, which is updated every minute by the synchronization (SYNC) command from IBOX. This matching between the local time and the absolute GPS time is for the purpose of being used as the reference to reconstruct the absolute time of each physical event that is stored in the raw data of type SCI\_0B. Section~\ref{sec:abs_time_recon} will discuss the method to reconstruct the absolute time of each event. While for the engineering data packets the absolute time is not needed to be calculated separately because the absolute GPS time value has already been tagged into each engineering data packet when it is generated.
+
+\subsection{ENG\_0B Data}
+The raw data of both type SCI\_0B and type AUX\_0B are transferred by the LVDS (Low-Voltage Differential Signaling) bus communication while the raw data of type ENG\_0B is transferred by the separated 1553B communication channel from POLAR IBOX. The raw data of type ENG\_0B is the data stream of fixed length (76 bytes) binary packets. Several different types of data are stored in the raw data of type ENG\_0B, which are part of the housekeeping data (like the trigger rate of each module) from POLAR OBOX, the feedback of command injections, the feedback of platform parameters and the digital telemetry data. The four types of data are stored in different packets and can be identified from each other by the special code stored in the packet header. The most important data packet is the one containing the feedback of platform parameters, which is the only necessary data from the raw data of type ENG\_0B that is needed by the science data analysis. Therefore only the data packets containing the platform parameters are extracted and decoded. One new data packet with the updated platform parameters is generated every second. The platform parameters mainly include the position/velocity in the WGS-84 (World Geodetic System 1984) coordinate and the attitude information (yaw/roll/pitch angle) of TG-2 platform as well as the corresponding UTC time. These parameters are necessary for calculating the pointing direction of POLAR. The pointing direction of POLAR is necessary for the later calculation of the incident angle of GRBs in POLAR's local coordinate. The incident angle is needed by both the study of localization of GRB using the data of POLAR~(\citealt{SUAREZGARCIA2010624}) and the Monte Carlo simulation~(\citealt{Kole2017}) for polarization analysis. The pointing direction of POLAR is firstly calculated in the WGS-84 coordinate then transfered to the celestial coordinate (J2000) which is widely used in the astrophysics field. Section~\ref{sec:coo_trans} will discuss the method of the pointing direction calculation and the coordinate transformation for POLAR.
+
+\section{Raw data pre-processing pipeline}
+
+The pipeline for pre-processing the raw data of POLAR is schematically described by Figure~\ref{fig:preprocessing_pipeline}. The three types of 0B level raw data are firstly decoded by steps \ding{172}, \ding{173} and \ding{174} respectively. The decoding process for the three different types of data involves several common program modules in charge of iterating the frames and packets within each file and extracting values from each packet according to the format specification of the raw data. Those common program modules will be discussed in Section~\ref{sec:iterator_decoder}. Then several other steps are involved for different purposes after the decoding steps. In this section, a general description of the pipeline for each step will be given firstly then the main algorithms involved in those steps as well as the more details will be discussed in the subsections. Finally a subsection discussing the file organization and the automatization of the pipeline will be given.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=10cm]{images/preprocessing_pipeline.png}
+\caption{Raw data pre-processing pipeline for POLAR}\label{fig:preprocessing_pipeline}
+\end{figure}
+\begin{dingautolist}{172}
+\item Decoding of raw data of type AUX\_0B. In this step all the engineering parameters like temperature and high voltage need to be converted from binary data to meaningful physical values after they are extracted. The decoded data of type AUX\_0B in the first stage is called the data product of level AUX\_1M.
+\item Decoding of raw data of type SCI\_0B. In this step the packets of the same event from FEEs should be correctly aligned to the corresponding packet from CT (Section~\ref{sec:time_alignment}) after they are decoded and all the packets belonging to the same event should be properly organized by a certain mechanism (Section~\ref{sec:event_org}) in the decoded data file. The decoded data of type SCI\_0B in the first stage is called the data product of level SCI\_1M.
+\item Decoding of raw data of type ENG\_0B. In this step the packets containing the platform parameters data (PPD) need to be firstly found out during the packets iteration then undertaken the decoding process. The calculation for the pointing direction of POLAR as well as the coordinate transformation (Section~\ref{sec:coo_trans}) are also needed to be performed in this step after the platform parameters are extracted and decoded. The decoded platform parameters data from the raw data of type ENG\_0B in the first stage is called the data product of level PPD\_1M.
+\item As mentioned in Section~\ref{sec:raw_data}, the time of each event in the data of type SCI\_1M decoded from type SCI\_0B is the local CT time in the POLAR instrument. And the data of type AUX\_1M decoded from AUX\_0B contains the matching between the local CT time and the absolute GPS time which is updated every minute. Therefore, this step is to use the local CT time in SCI\_1M and the absolute GPS time reference in AUX\_1M to reconstruct the absolute time of each event (Section~\ref{sec:abs_time_recon}). The data product after the absolute time of each event is calculated and attached is called the data product of level SCI\_1P.
+\item The time range of the data files of type SCI\_0B and AUX\_0B are always the same as well as the corresponding AUX\_1M and SCI\_1M (1P) because they are transferred out from POLAR by the same LVDS bus communication channel. While the time range of the data file of type ENG\_0B as well as the corresponding PPD\_1M is different from that of SCI\_0B and AUX\_0B as a result of the different data transmission channel which is the 1553B communication channel. In order to merge the data of the three different types in step \ding{177} conveniently, this step is to align the data time range of PPD\_1M with that of SCI\_1P and AUX\_1M by doing the data splitting and merging on the data file of type PPD\_1M. Then the generated data of type PPD\_1N has the same time range as that of SCI\_1P and AUX\_1M.
+\item This step is to merge the data of the three types SCI\_1P, AUX\_1M and PPD\_1N into a single data file with simpler data structure (Section~\ref{sec:data_merging}), where the organization of event data is highly simplified and each event is attached with the engineering parameters (temperature measurement, high voltage setting, etc.) and the platform parameters (position of TG-2, pointing direction of POLAR, etc.). In the merging process only the data fields from the three types that are necessary for the science data analysis are kept. The merged data file is called the data product of level SCI\_1Q, which is proposed to be the input of the science data analysis like the in-orbit calibration and the polarization analysis.
+\end{dingautolist}
+
+\subsection{Iterators and Decoder}\label{sec:iterator_decoder}
+The raw data of all the three types is actually the sequence of binary frames and packets. Each kind of frame and packet have their specific headers at the beginning. For type SCI\_0B and AUX\_0B, the packets also have the CRC (Cyclic Redundancy Check) code at the ending. And in the middle is the data of either the scientific detection data or the engineering data. The headers are used to identify and separate different frames and packets, while the CRC code is used to check if the frames and packets are transferred correctly. For each type of data a separate iterator module is designed in charge of iterating the frames and packets sequence and doing the CRC checking for each frame and packet. The responsibilities of the iterator of each data type are listed below. The decoder is designed as a class with several member functions to extract values from the frames and packets provided by the iterators given the range of bytes or bits.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=14cm]{images/sci_data_frame.png}
+\caption{Structure of the frame and the packed trigger and module packets of SCI\_0B data.}\label{fig:sciframe}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=12cm]{images/sci_data_decoding.png}
+\caption{Flow diagram schematically showing the procedure of frame and packet iterating for SCI\_0B data.}\label{fig:sciframe_iterating}
+\end{figure}
+
+\begin{itemize}
+
+\item For the raw data of type SCI\_0B, the data of each physical event consists of one trigger packet from the CT and one or more module packets from the triggered FEEs. Those packets are relatively short and can have variable length. Those packets are firstly generated in the OBOX then transferred to the IBOX where they are packed into a series of longer frames with a fixed length of 2052 bytes. The structure of the frame and the trigger and module packets packed in it is shown in Fig.~\ref{fig:sciframe}. The iterator for type SCI\_0B is therefore responsible for iterating the fixed length frames and the short variable length packets within those frames, doing packet connecting for the packets that are across two adjacent frames and doing the CRC checking to tag good or bad packets. For SCI\_0B data two different kinds of iterators are designed for frame iterating and packet iterating respectively and the frame and packet iterating procedure is schematically illustrated by the flow diagram shown in Fig.~\ref{fig:sciframe_iterating}.
+
+\item For the raw data of type AUX\_0B, each packet of the engineering data from the OBOX is split into two smaller packets in the IBOX which are called the odd packet and the even packet respectively, the length of both is fixed 260 bytes. These two different packets are transferred out separately from the IBOX every second. The iterator for type AUX\_0B is therefore responsible for iterating the fixed length packets, connecting the odd and even packets which belong to the same OBOX packet and doing the CRC checking.
+
+\item The raw data of type ENG\_0B is simply sequence of packets with a fixed length of 76 bytes. Therefore the iterator for type ENG\_0B is also very simple, whose responsibility is just to iterate the fixed length packets. During the iterating process, the iterator for type ENG\_0B identifies and only keeps the PPD packets for decoding according to the information in the header as only the PPD data is needed for later science data analysis.
+
+\end{itemize}
+
+\subsection{Time Alignment Algorithm for Physical Event} \label{sec:time_alignment}
+
+The trigger packets and module packets that belong to different events are mixed together in the raw data. The goal of time alignment is to correctly align the trigger packet and the module packets that belong to the same event. The trigger packets from CT and the module packets from the same FEE are always stored in the order of time but not guaranteed for the packets from different FEEs and the packets from CT and FEE for different events. The packets of one event have the chance to be transferred out earlier than that of the event before the current event when the physical event rate is high because of the time delay of data transmission between CT and FEE. Therefore, it is hard to only use the information of packet order in the raw data file to align the trigger packet and module packets for physical events.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=14cm]{images/time_alignment_method.png}
+\caption{Schematic representation of the time alignment algorithm for both pedestal events and physical events. Where blue boxes represent trigger packets from CT, red boxes represent module packets from FEE and gray rectangles represent priority queues. The leftmost column shows the trigger and module packets of pedestal events by the packets order in the raw data file, and the right columns show the trigger and module packets of physical events after they are pushed into the priority queues.}
+\label{fig:time_align}
+\end{figure}
+
+Besides the detected physical event data, the raw data of type SCI\_0B also contains the pedestal event data for the purpose to measure the pedestal level of each channel in the calibration process~(\citealt{LI20188}). Normally each pedestal event has one trigger packet from CT and one module packet from each FEE, which are totally 26 packets. As the rate of pedestal event is very low (1\,Hz) and the 1 second waiting time between two adjacent pedestal events is far longer than the data transmission time delay, the packets that belong to the same pedestal event are always adjacent with each other in the raw data. It is also found from the raw data that the trigger packet is always transferred out earlier than the module packets for the same event. Therefore, not like the case of physical events, for pedestal events it is very easy to align the trigger packets and module packets that belong to the same pedestal event only according to the packets order in the raw data as shown by the leftmost column in Figure~\ref{fig:time_align}. After the packets of pedestal events are properly aligned, the aligned pedestal events can provide one kind of important information, that is the timestamp offset between CT and FEE. The timestamp offset is caused by the different starting time between CT and FEE. This timestamp offset is needed by the alignment of trigger packets and module packets for physical events based on timestamp comparison.
+
+For aligning the packets of physical events, two kinds of information can be used. One is the timestamp of the two kinds of packets as mentioned above and the other one is the trigger information of module that is stored in the trigger packet of each event. The timestamp value after the correction of the offset between CT and FEE can be used to check if two packets belong to the same physical event. The trigger information of module that is stored in trigger packet is one bit for each module to identify if the module is triggered and therefore has a module packet or not in this event. With the two kinds of information, the alignment algorithm for physical events is implemented as below:
+
+\begin{itemize}
+\item Step 1. Establish 25 priority queues\footnote{\url{https://en.wikipedia.org/wiki/Priority_queue}} for the module packets from the 25 FEEs and 1 priority queue for the trigger packet from the CT. In each priority queue, the priority level is set using the timestamp, then all the packets in each priority queue are sorted by time where the packet with the earliest timestamp will always be at the top of the priority queue.
+\item Step 2. During the packets iterating and decoding, the decoded packets are pushed into the corresponding priority queues according to the type and the module ID of the packet.
+\item Step 3. As shown in Fig.~\ref{fig:time_align}, take the trigger packet at the top of the priority queue of trigger packets, then check the trigger information of module that is stored in the trigger packet and accordingly take the module packets at the top of the priority queues of module packets for only the modules which are triggered in this event. Lastly, compare the timestamps of those module packets after the offset correction with that of the trigger packet to check if those module packets have the timestamps similar with that of the trigger packet and therefore belong to this event.
+\end{itemize}
+
+In this method, the situation of packet loss can also be properly coped with according to the difference of the timestamps between trigger packets and module packets. For example, in Step 3 if the timestamp of one module packet is too late than that of the trigger packet, this can be caused by the packets loss of the module, and the module packet with the later (or larger) timestamp should belong to one of the events after the current event. Therefore, in each trigger packet one extra counter is attached to record the number of module packets that are lost in this event. It should be noted here that in Step 3 the module priority queues should accumulate a certain number of packets before doing the timestamp comparison to avoid the false judgement of packets loss due to the delay of packets transmission between CT and FEEs.
+
+This event alignment method is based on the trigger information of module that is stored in trigger packets and the timestamp comparison between trigger packets and module packets, therefore this method is also called the time alignment method. According to the processing result using in-orbit data, this method can correctly align more than 99.99\% of all the module packets. This is calculated by calculating the ratio of the number of module packets which successfully found their corresponding trigger packet by using the priority queue method and comparing timestamp over the total number of module packets for physical events.
+
+\subsection{Organization of Event Data}\label{sec:event_org}
+As mentioned above, the relationship between the trigger packet and module packet for one event is a one-to-many relationship. However the data structures of the two kinds of packets are different and therefore it is hard to store them in the same TTree, which is the main structure to organize data in ROOT. The decoded data in the first stage should contains all the information in the raw data and in order to save data space and to efficiently read the decoded data event by event a special structure is designed to organize the event data in the ROOT file.
+
+\begin{table}[!ht]
+\centering
+\caption{Example of the special numbers for organizing event data using two TTrees.}
+\label{tab:org-event-data}
+\scriptsize
+\begin{tabular}{| c | c | c | c !{\vrule\,\vrule} c | c | c | c |}\hline
+  \multicolumn{4}{| c !{\vrule\,\vrule}}{\textbf{t\_trigger}} & \multicolumn{4}{ c |}{\textbf{t\_modules}} \\\hline
+  entry & trigg\_num & pkt\_start & pkt\_count & entry & trigg\_num & ct\_num & event\_num \\\hline
+  0 & 0 & 0  & 2 & 0  & 0 & 2  & 0 \\\hline
+    &   &    &   & 1  & 0 & 3  & 0 \\\hline
+  1 & 1 & 2  & 3 & 2  & 1 & 8  & 0 \\\hline
+    &   &    &   & 3  & 1 & 7  & 0 \\\hline
+    &   &    &   & 4  & 1 & 2  & 1 \\\hline
+  2 & 2 & 5  & 1 & 5  & 2 & 3  & 1 \\\hline
+  3 & 3 & 6  & 2 & 6  & 3 & 6  & 0 \\\hline
+    &   &    &   & 7  & 3 & 7  & 1 \\\hline
+  4 & 4 & 8  & 2 & 8  & 4 & 3  & 2 \\\hline
+    &   &    &   & 9  & 4 & 4  & 0 \\\hline
+  5 & 5 & 10 & 3 & 10 & 5 & 12 & 0 \\\hline
+    &   &    &   & 11 & 5 & 7  & 2 \\\hline
+    &   &    &   & 12 & 5 & 8  & 1 \\\hline
+  6 & 6 & 13 & 1 & 13 & 6 & 3  & 3 \\\hline
+  7 & 7 & 14 & 2 & 14 & 7 & 2  & 2 \\\hline
+    &   &    &   & 15 & 7 & 3  & 4 \\\hline
+\end{tabular}
+\end{table}
+
+As shown in Table~\ref{tab:org-event-data}, two different TTrees are used to store the trigger packets and module packets, the names of which are ``t\_trigger'' and ``t\_modules'' respectively. In each TTree there are some special numbers to maintain the one-to-many relationship between the trigger packet and module packets that belong to the same event. Every valid trigger packet has been given a sequence number which is called ``trigg\_num''. In t\_modules the module packets that belong to the same event are stored adjacently and each module packet records the trigg\_num of the trigger packet of the event. As TTree supports randomly accessing entry by the entry number and in order to efficiently read the data event by event, each trigger packet in t\_trigger records the position of the corresponding module packets in t\_modules using ``pkt\_start'' and ``pkt\_count'', where pkt\_start records the starting entry number of the sequence of module packets stored in t\_modules and pkt\_count records the number of module packets for the event. The ``ct\_num'' in the module packet is the ID of the module to which the packet belongs, and the ``event\_num'' is a sequence number like the the trigg\_num but the scope of event\_num is within one single module. Table~\ref{tab:org-event-data} illustrates some examples of these special numbers for organizaing event data using two different TTrees, where each non-empty row means an entry in the TTree.
+
+It should be noted here that this structure of event data organization with two different TTrees is only used for the decoded data after the first stage. This structure is to maintain the relationship between trigger packets and module packets and at the same time to reserve all the information in the raw data using a scheme that can save data space as much as possible. Afterwards, a much more simple structure to organize the event data will be introduced for the convenience of science data analysis, which will be discussed in Section~\ref{sec:data_merging}.
+
+\subsection{Absolute Time Reconstruction}\label{sec:abs_time_recon}
+
+The engineering data of type AUX\_0B contains the matching between the GPS time from PPS and the local timestamp of CT. This matching is updated every minute. In order to reconstruct the absolute time of each event, an iterator to read the pair of the GPS time and the CT timestamp from the decoded AUX data (AUX\_1M) one by one is designed as the first step. Then when calculating the absolute time of one event the GPS-timestamp pair that is nearest in time to the frame in which the trigger packet of the event is can be used. The header of each frame in the raw data of SCI\_0B has the GPS time when the frame is generated as shown in Fig.~\ref{fig:sciframe}, therefore it is very easy to calculate the time distance between the frame and the GPS-timestamp pair. Using the GPS-timestamp pair that is nearest in time to the event is mainly concerning the effect of the temperature change on the frequency of the clock in CT. The temperature of the full instrument as well as that of the CT is changing periodically due to the position change of the instrument in different orbits. As shown in Figure~\ref{fig:freq_vs_temp}, the frequency of the clock in CT is also changing periodically as the change of the temperature of CT. It can also be seen that the frequency of the clock in CT has a clear inverse correlation with the temperature of CT. As the timestamp of CT is given by the clock in CT, in the plot the frequency of the clock in CT is calculated using the two adjacent GPS-timestamp pairs by equation $f = (t_2 - t_1) / (T_2 - T_1)$, where $f$ is the clock frequency, $t_2$ and $t_1$ are the two timestamps and $T_2$ and $T_1$ are the two GPS times in the two adjacent GPS-timestamp pairs. During the process of the absolute time reconstruction, the correction for the effect of temperature on the clock frequency is therefore performed for all the events within every minute that are between two adjacent GPS-timestamp pairs. The correction is using the calculated clock frequency for every minute instead of the standard frequency of the clock in CT (12.5\,MHz) when calculating the absolute time for each event. With the calculated clock frequency $f$, the absolute time of each event is calculated by equation $t_{abs} = (t_{loc} - t_1) / f + T_1$, where $t_{loc}$ is the local timetamp of the event and $t_{abs}$ is the reconstructed absolute GPS time of the event with the unit of second.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=13cm]{images/freq_vs_temp.png}
+\caption{The curves of the frequency of the clock in CT (up) and the temperature of CT (down) vs. time.}\label{fig:freq_vs_temp}
+\end{figure}
+
+Using the absolute time of each event reconstructed with the GPS-timestamp pairs taking the temperature effect into account, the study of the evolution of the spin frequency of the Crab pulsar as presented in Ref.~(\citealt{Zheng2017}) shows that the spin frequency evolution result of the Crab pulsar achieved using POLAR's data is consistent with that using Fermi's data, which means that the time system of POLAR is accurate and stable. Ref.~(\citealt{Zheng2017}) also shows that the sigma of the time residuals of the Crab pulsar observed by POLAR is $84\mu s$, which includes both the error of the reconstructed absolute time of POLAR and also the non-zero red noise of the spin frequency of the Crab pulsar. This means the error of the reconstructed absolute time of POLAR is less than $84\mu s$.
+
+\subsection{Pointing Direction Calculation and Coordinate Transformation} \label{sec:coo_trans}
+The Z and X axes of POLAR are two vectors that are initially defined in the coordinate of TG-2 after POLAR was mounted. The direction of the Z axis is along while the X axis is perpendicular to the PS bar direction. The directions of the Z and X axes of POLAR detector are needed to be calculated in the J2000 coordinate. Using the directions of Z and X axes of POLAR together with the direction of one GRB in the J2000 coordinate, the incident angle of the GRB in the detector coordinate can be calculated. The platform parameters that are needed for calculating the directions of the Z and X axes of POLAR in the J2000 coordinate consist of:
+\begin{itemize}
+\item the attitude parameters of TG-2, that is the three Euler angles of yaw, roll and pitch of TG-2, which are referred as $\Psi$, $\phi$ and $\theta$ respectively,
+\item the position and instant velocity of TG-2 in the WGS-84  coordinate, which are respectively referred as $\bm{P} = (x_w, y_w, z_w)$ and $\bm{V} = (\dot{x}_w, \dot{y}_w, \dot{z}_w)$.
+\item the UTC (Coordinated Universal Time) corresponding to the recorded platform parameters, which is referred as $t$,
+\item the directions of Z and X axes in the GNC (Guidance, Navigation and Control) coordinate of TG-2, which are referred as $\bm{k}_g = (x_{k}, y_{k}, z_{k})$ and $\bm{i}_g = (x_i, y_i, z_i)$ respectively.
+\end{itemize}
+
+According to the coordinate definitions, the direction of Z (or X) axis is firstly transformed from the GNC coordinate ($\bm{k}_g$) to the orbit coordinate ($\bm{k}_o$) by Eq.~\eqref{equ:gnc_to_orbit}.
+\begin{equation}\label{equ:gnc_to_orbit}
+\bm{k}_o = \bm{R}_{go}(\Psi, \phi, \theta) \cdot \bm{k}_g
+\end{equation}
+where $\bm{R}_{go}(\Psi, \phi, \theta)$ is the rotation matrix with the rotating order $Z(\Psi) \rightarrow X(\phi) \rightarrow Y(\theta)$\footnote{\url{https://en.wikipedia.org/wiki/Euler\_angles\#Rotation\_matrix}}. Then the direction of Z (or X) axis is transferred from the orbit coordinate ($\bm{k}_o$) to the WGS-84 coordinate ($\bm{k}_w$) by Eq.~\eqref{equ:orbit_to_wgs84}.
+\begin{equation}\label{equ:orbit_to_wgs84}
+\bm{k}_w = \bm{R}_{ow}(\bm{P}, \bm{V}) \cdot \bm{k}_o
+\end{equation}
+where $\bm{R}_{ow}(\bm{P}, \bm{V})$ is the coordinate transformation matrix between the orbit coordinate and the WGS-84 coordinate, which can be calculated using the parameters $\bm{P}$ and $\bm{V}$ according to the definition of the orbit coordinate. Finally, together with the UTC, the direction of Z (or X) axis in the WGS-84 coordinate ($\bm{k}_w$) needs to be transformed to that in the J2000 coordinate ($\bm{k}_j$). For this transformation, the Python module PyEphem\footnote{\url{http://rhodesmill.org/pyephem}} or the C++ library libnova\footnote{\url{http://libnova.sourceforge.net}} can be used and two basic steps are involved:
+\begin{itemize}
+\item Step1. calculate the longitude and latitude corresponding to $\bm{k}_w$ and the sidereal time at the current position ($\bm{k}_w$) and UTC (t),
+\item Step2. convert the position of $\bm{k}_w$ in the celestial coordinate of current epoch to that of epoch J2000.
+\end{itemize}
+
+With the calculated directions of the Z and X axes of POLAR in the J2000 coordinate and the locations of GRBs provided by other instruments like Swift and Fermi the calculated incident angles of GRBs are as expectation by examining the relative count rates of the 25 modules of POLAR for the detected GRBs. The study of the localization of GRBs using POLAR's data is currently ongoing and the localization results of POLAR are consistent with those provided by other instruments within statistical error. This indicates that the directions of Z and X axes of POLAR in the J2000 coordinate calculated by the procedure presented in this section are correct.
+
+\subsection{Data Merging and Reorganization}\label{sec:data_merging}
+
+Before the data merging process that will be discussed in this section, the event data, the engineering data and the platform parameters data are stored separately in three different files. And the structure for organizing the event data is relatively complicated as discussed in Section~\ref{sec:event_org}. This multi-file scheme is not convenient for the science data analysis. Therefore, a higher level of data product called SCI\_1Q is generated based on the three kinds of data which are SCI\_1P, AUX\_1M and PPD\_1N. To generate data product of level SCI\_1Q, the following operations are performed:
+
+\begin{table}[!ht]
+\centering
+\small
+\caption{Some important data fields in the data of level SCI\_1Q}\label{tab:sci_1q}
+\begin{tabular}{|l|l|l|}\hline
+Type\tablefootnote{\url{https://root.cern.ch/root/atlfast/html/ListOfTypes.html}} & Name & Description \\\hline\hline
+Long64\_t & event\_id & local sequence number of the event \\\hline
+Double\_t & event\_time & MET time of the event\\\hline
+Int\_t & type & in-orbit recognized type of the event\\\hline
+Bool\_t & is\_ped & indicates if the event is pedestal event \\\hline
+Bool\_t[25] & trig\_accepted & triggering status of each module \\\hline
+Bool\_t[25] & time\_aligned & time alignment status of each module \\\hline
+Int\_t & pkt\_count & number of module packets for the event \\\hline
+Int\_t & lost\_count & number of lost mod. packets for the event \\\hline
+Bool\_t[25][64] & trigger\_bit & triggering status of each channel \\\hline
+Int\_t & trigger\_n & total number of triggered channels \\\hline
+Int\_t[25] & multiplicity & number of triggered channels for each module \\\hline
+Float\_t[25][64] & energy\_value & energy deposition value of each channel \\\hline
+UShort\_t[25][64] & channel\_status & energy readout status of each channel \\\hline
+Float\_t[25] & common\_noise & common noise of each module \\\hline
+Int\_t[25] & compress & data compress mode of each module \\\hline
+Float\_t[25] & fe\_hv & HV setting of each FEE (from AUX) \\\hline
+Float\_t[25] & fe\_temp & temperature of each FEE (from AUX) \\\hline
+Double\_t[3] & wgs84\_xyz & position of TG-2 (from PPD) \\\hline
+Double\_t[2] & det\_z\_radec & direction of POLAR Z axis (from PPD) \\\hline
+Double\_t[2] & det\_x\_radec & direction of POLAR X axis (from PPD) \\\hline
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+\item The trigger packet and module packets of each event are merged into a single TTree, and the pedestal events and physical events are also merged together into the same TTree which are previously stored separately in data level SCI\_1P.
+\item The time of each event is converted from GPS time to MET (Mission Elapse Time) starting from the launch time of TG-2. MET is a double float value with the unit of second.
+\item The engineering data and the platform parameters data that are needed by science analysis are attached to each event according to time. The values of the engineering data and platform parameters data are linearly interpolated by time for each event.
+\item In the merging process only the data fields that are directly needed by science analysis are kept, and the data fields that are not necessary for science analysis are discarded.
+\item One sub-level number is attached to each data file of level SCI\_1Q to indicate the number of stages that the data file has been undergone in the science data analysis pipeline.
+\end{itemize}
+
+The data of level SCI\_1Q is designed for the standard science data analysis pipeline as discussed in Ref.~(\citealt{LI20188}). Even though the data size is approximately doubled comparing with SCI\_1P after the merging, but with the relatively simple data structure and the single TTree scheme of data level SCI\_1Q, the data analysis pipeline software is highly simplified. Some important data fields in the data of level SCI\_1Q are listed in Table~\ref{tab:sci_1q}.
+
+\subsection{File Organization, Processing Automatization and Email Notification}
+At the time when in operation, every day about 40 gigabytes, in average, of 0B level raw data is produced in-orbit by POLAR and transferred to the PSDC in IHEP. The raw data files are firstly organized by a strategy using one day as a unit. The raw data transferred to IHEP in the same day will be collected and permanently stored in a single folder for the day and the folder name is right the date of the day. The raw data transferred in the next day will be stored in a new folder. This strategy can safely keep all the old data files intact on the PSDC server when continuously receiving new data files from POAC day by day.
+
+For the high level data products generated by the pipeline shown in Fig.~\ref{fig:preprocessing_pipeline}, the file organization uses a different strategy. All data files with the same type, such as SCI\_1M, AUX\_1M, PPD\_1M, SCI\_1P, PPD\_1N and SCI\_1Q, are all stored in the same folder named with the type name and no matter which day the files are generated. The name of each data file has the exact time range of the internal data with precision of 1 second. This strategy is chosen for the convenience of the processing pipeline's automatization as well as for users easily finding the data files of a specific type within a given time range.
+
+Manually finding and processing all the new raw data files every day is very time consuming. Therefore a series of scripts written by Python is prepared to automatize the whole data processing pipeline from 0B level to 1Q level as presented by Fig.~\ref{fig:preprocessing_pipeline}. Those scripts automatically start to run at some specific time points every day coordinating with the schedule of data transferring from POAC to IHEP. Once those scripts start to run they will firstly find out the new raw data files in the raw data folder of the current day by comparing file names, subsequently they will invoke the data pre-processing programs written by C++ to generate the high level data products for the new raw data and put them into the corresponding folders. For each file of the high level data products, the command to generate it and the screen output as well as the log output are all reserved in specific folders for later checking or regenerating the file when needed. After all the new raw data files are finished to generate the corresponding high level data products by the automatization scripts, one notification email will be generated based on what have been processed and sent by the built-in SMTP client of Python to the researchers of POLAR group who can access the data products on the PSDC server in IHEP. The notification email mainly includes the starting and finishing time for processing the newly found raw data, a list of all the new raw data files that have been processed, a list of all the new corresponding high level data product files that have been generated, and information of any errors occurred during the processing. According to the notification email, the researchers can login the PSDC server and analyze the interesting data files on the server and the data products maintainers take charge of coping with the exceptions and errors found during the processing. With the automatization scripts, the full pipeline from the 0B level raw data to the 1Q level data product as presented by Fig.~\ref{fig:preprocessing_pipeline} can be finished within 3 hours for 10 gigabytes of raw data files after they arrive at IHEP. This is efficient enough for the following science data analysis.
+
+This observation raw data pre-processing and high level scientific data products generation pipeline and the automatization scripts introduced in this section already continuously worked for several months without many manual interventions on the PSDC server in IHEP for POLAR. The core software units used in this data processing pipeline, such as the decoding and time alignment program for SCI\_0B data, the decoding program for AUX\_0B data, the absolute time reconstruction program, etc. were fully tested and extensively used by processing the ground calibration data and the firmware testing data before the launch of POLAR. And the full pipeline was well validated by the success of automatically processing all the in-orbit data of POLAR and taking service for the science data analysis of researchers after POLAR was launched.
+
+\section{Higher level Scientific data products}
+
+With the data of level SCI\_1Q, most of the science analysis for POLAR can be performed. However, concerning the future data publication as well as the convenience of the internal use of the data of POLAR, some higher level scientific data products can be designed and generated. Generating the higher level scientific data products mainly consist of two aspects: data archiving and the scientific data products of specific celestial sources. For data archiving, it needs to recombine the data files of level SCI\_1Q in order to remove the data duplication among different files and to organize each data file with a fixed short time length, for example, make each data file have one hour of data. For the scientific data products of specific celestial sources, it needs to firstly extract the data segment of SCI\_1Q at the time when one event like GRB or solar flare occurred and was detected by POLAR then add some property information of the event, such as the T0, T90, location in the J2000 coordinate, incident angle and the energy spectrum parameters of the source. The energy spectrum parameters can be either given by other instruments or provided by the analysis using the data of POLAR itself. As the FITS\footnote{\url{https://fits.gsfc.nasa.gov}} file format is widely used in the field of astronomy, either the FITS files or the tools to convert the ROOT files to FITS files for each type of the higher level scientific data products can also be provided when they are published. The process of generating the higher level scientific data products will not involve some complicated procedures besides the simple procedures like the data splitting and merging for the data files of SCI\_1Q and the addition of some extra meta-information related to the source, therefore, this section will not give more details about this process.
+
+\section{Summary and Conclusions}
+POLAR is a space-borne Gamma-Ray Burst polarimeter onboard Chinese space laboratory TG-2 which was successfully launched on 15th September, 2016. In order to pre-process the in-orbit data of POLAR that is transferred from TG-2 to ground as quickly as possible and generate the high level scientific data products that are suitable for later science analysis, a full software pipeline was designed and developed before the launch date of POLAR and this paper presented a detailed introduction to the pipeline. The three types of raw data of POLAR and the pre-processing requirements are firstly introduced. Then each step of the pipeline is discussed as well as the relevant algorithms and methods that are used in those steps. The most important data is the event data detected by the POLAR detector, and the the event data is converted by four steps: SCI\_0B $\rightarrow$ SCI\_1M $\rightarrow$ SCI\_1P $\rightarrow$ SCI\_1Q. The scientific data product of level SCI\_1Q simplified the data structure of the event data and merged the necessary engineering data and platform parameters data that are respectively decoded from the raw data of type AUX\_0B and ENG\_0B. The SCI\_1Q data product is chosen as the input and as a standard data format in the science data analysis pipeline in the POLAR Science Data Center (PSDC) in IHEP. Some higher level scientific data products for the data archiving and the specific events like GRB and solar flare events can be generated based on the data product of level SCI\_1Q. The in-orbit observation data pre-processing and scientific data products generation pipeline and the related software can work automatically without manual intervention for most of the time after the raw data of POLAR arrive at IHEP and has been continuously and successfully used for months by the PSDC in IHEP after POLAR was launched and switched on. In practice, the full pipeline from the 0B level raw data to the 1Q level data product for the science data of POLAR can be finished within 3 hours for 10 gigabytes of raw data files after they arrive at IHEP, which is efficient enough for the following science data analysis. And after the pipeline for all the new raw data arrived has been finished, an email noticing new scientific data products generation will be automatically sent to the researchers who can access the scientific data products. With the scientific data products generated by this pipeline the in-orbit calibration of POLAR has been finished and published so far and the first scientific results of POLAR have been produced and submitted recently.
+
+\begin{acknowledgements}
+We gratefully acknowledge the financial support from the Joint Research Fund in Astronomy under the cooperative agreement between the National Natural Science Foundation of China and the Chinese Academy of Sciences (Grant No. U1631242), the National Natural Science Foundation of China (Grant No. 11503028, 11403028), the Strategic Priority Research Program of the Chinese Academy of Sciences (Grant No. XDB23040400) and the National Basic Research Program (973 Program) of China (Grant No. 2014CB845800).
+\end{acknowledgements}
+
+\bibliographystyle{raa}
+\bibliography{references}
+
+\end{document}
