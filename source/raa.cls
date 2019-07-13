@@ -202,9 +202,9 @@ twoside,                final,10pt,runningheads} %%% 10pt zjz 0601
 \else                                 %preprint, final version
   \setlength{\textwidth}{145mm}       %RAA 
   \setlength{\textheight}{210mm}      %% 
-  \topmargin=0pt
-  \oddsidemargin=0pt
-  \evensidemargin=0pt
+  \topmargin=22pt
+  \oddsidemargin=20pt
+  \evensidemargin=20pt
   \parindent=6mm
   \arraycolsep 1mm  
 \fi
@@ -592,7 +592,7 @@ twoside,                final,10pt,runningheads} %%% 10pt zjz 0601
     \vspace{-8.1mm}         %%zay: 2006.09.07
     {\small  Research in Astron. Astrophys. {#1 } \\   %Vol.0 (200x) No.0, 000--000 \\
     {\it http://www.raa-journal.org\/~~~~~ http://www.iop.org/journals/raa}\/ 
-    % {(\small \LaTeX:~~\jobname.tex;~~printed on \today; \timenow)} %Added by Xianghua on 16 Oct 2015
+    %{(\small \LaTeX:~~\jobname.tex;~~printed on \today; \timenow)} %Added by Xianghua on 16 Oct 2015
     %\hfill~~ \\
     \hfill~~ \\
 %%  {\bf REVIEW}            %% preserved for Editor
